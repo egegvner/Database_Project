@@ -101,7 +101,7 @@ def main():
 
     with st.sidebar:
         st.header("Navigation")
-        menu = ["Add User", "Add Place", "Log Visit", "View Visits", "Most Visited Places"]
+        menu = ["Add User", "Delete User", "Add Place", "Delete User", "Log Visit", "Delete Visit", "View Visits", "Most Visited Places"]
         choice = st.radio("Go to", menu, index=0)
 
         places = get_places_list()
@@ -126,6 +126,22 @@ def main():
                 st.success(f"User '{name}' added with ID {user_id}")
             else:
                 st.error("Please enter a valid name.")
+    
+    elif choice == "Delete User":
+        st.subheader("Delete User")
+        users = get_users()
+        if not users:
+            st.info("No users found. Add a user first.")
+        else:
+            user_names = {f"{u[1]} (ID {u[0]})": u[0] for u in users}
+            selected_user_label = st.selectbox("Select user to delete", list(user_names.keys()))
+            if st.button("Delete User"):
+                selected_user_id = user_names.get(selected_user_label)
+                if selected_user_id:
+                    delete_user(selected_user_id)
+                    st.success(f"User '{selected_user_label.split(' (ID')[0]}' deleted.")
+                else:
+                    st.error("Please select a valid user.")
 
     elif choice == "Add Place":
         st.subheader("Add New Place")
@@ -138,6 +154,22 @@ def main():
                 st.success(f"Place '{place_name}' added with ID {place_id}")
             else:
                 st.error("Please enter a valid place name.")
+
+    elif choice == "Delete Place":
+        st.subheader("Delete Place")
+        places = get_places_list()
+        if not places:
+            st.info("No places found. Add a place first.")
+        else:
+            place_names = {f"{p[1]} (ID {p[0]})": p[0] for p in places}
+            selected_place_label = st.selectbox("Select place to delete", list(place_names.keys()))
+            if st.button("Delete Place"):
+                selected_place_id = place_names.get(selected_place_label)
+                if selected_place_id:
+                    delete_place(selected_place_id)
+                    st.success(f"Place '{selected_place_label.split(' (ID')[0]}' deleted.")
+                else:
+                    st.error("Please select a valid place.")
 
     elif choice == "Log Visit":
         st.subheader("Log a Visit")
@@ -173,6 +205,35 @@ def main():
                     st.success(f"Visit logged for {selected_user_label.split(' (ID')[0]} at {selected_place_label.split(' (ID')[0]}")
                 else:
                     st.error("Please fill in all fields correctly.")
+
+    elif choice == "Delete Visit":
+        st.subheader("Delete a Visit")
+        users = get_users()
+        if not users:
+            st.info("No users found. Add a user first.")
+        else:
+            user_names = {f"{u[1]} (ID {u[0]})": u[0] for u in users}
+            selected_user_label = st.selectbox("Select user", list(user_names.keys()))
+            selected_user_id = user_names.get(selected_user_label)
+            if selected_user_id:
+                visits = get_user_visits(selected_user_id)
+                if not visits:
+                    st.info("No visits found for this user.")
+                else:
+                    visit_options = {f"{v[0]} on {v[1]} for {v[2]} min (Visit ID unknown)": idx for idx, v in enumerate(visits)}
+                    selected_visit_label = st.selectbox("Select visit to delete", list(visit_options.keys()))
+                    if st.button("Delete Visit"):
+                        c.execute('''SELECT v.visit_id 
+                                     FROM visits v 
+                                     JOIN places p ON v.place_id = p.place_id 
+                                     WHERE v.user_id = ? AND p.place_name = ? AND v.visit_date = ? AND v.stay_duration = ?''', 
+                                  (selected_user_id, *selected_visit_label.split(' on ')[0:2], int(selected_visit_label.split(' for ')[1].split(' min')[0])))
+                        visit_record = c.fetchone()
+                        if visit_record:
+                            delete_visit(visit_record[0])
+                            st.success("Visit deleted.")
+                        else:
+                            st.error("Could not find the selected visit.")
 
     elif choice == "View Visits":
         st.subheader("View User Visits")
