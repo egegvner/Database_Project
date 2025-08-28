@@ -101,7 +101,7 @@ def main():
 
     with st.sidebar:
         st.header("Navigation")
-        menu = ["Add User", "Delete User", "Add Place", "Delete User", "Log Visit", "Delete Visit", "View Visits", "Most Visited Places"]
+        menu = ["Add User", "Update User", "Delete User", "Add Place", "Update Place", "Delete Place", "Log Visit", "Update Visit", "Delete Visit", "View Visits", "Most Visited Places"]
         choice = st.radio("Go to", menu, index=0)
 
         places = get_places_list()
@@ -126,6 +126,23 @@ def main():
                 st.success(f"User '{name}' added with ID {user_id}")
             else:
                 st.error("Please enter a valid name.")
+
+    elif choice == "Update User":
+        st.subheader("Update User Name")
+        users = get_users()
+        if not users:
+            st.info("No users found. Add a user first.")
+        else:
+            user_names = {f"{u[1]} (ID {u[0]})": u[0] for u in users}
+            selected_user_label = st.selectbox("Select user to update", list(user_names.keys()))
+            new_name = st.text_input("New name", placeholder="Jane Smith")
+            if st.button("Update Name"):
+                selected_user_id = user_names.get(selected_user_label)
+                if selected_user_id and new_name and new_name.strip():
+                    update_user_name(selected_user_id, new_name.strip())
+                    st.success(f"User ID {selected_user_id} name updated to '{new_name}'")
+                else:
+                    st.error("Please select a valid user and enter a new name.")
     
     elif choice == "Delete User":
         st.subheader("Delete User")
@@ -154,6 +171,27 @@ def main():
                 st.success(f"Place '{place_name}' added with ID {place_id}")
             else:
                 st.error("Please enter a valid place name.")
+
+    elif choice == "Update Place":
+        st.subheader("Update Place")
+        places = get_places_list()
+        if not places:
+            st.info("No places found. Add a place first.")
+        else:
+            place_names = {f"{p[1]} (ID {p[0]})": p[0] for p in places}
+            selected_place_label = st.selectbox("Select place to update", list(place_names.keys()))
+            new_name = st.text_input("New place name", placeholder="New Place Name")
+            new_visit_count = st.number_input("New number of visits (leave 0 to keep unchanged)", min_value=0, step=1)
+            if st.button("Update Place"):
+                selected_place_id = place_names.get(selected_place_label)
+                if selected_place_id and new_name and new_name.strip():
+                    if new_visit_count == 0:
+                        update_place(selected_place_id, new_name.strip())
+                    else:
+                        update_place(selected_place_id, new_name.strip(), new_visit_count)
+                    st.success(f"Place ID {selected_place_id} updated.")
+                else:
+                    st.error("Please select a valid place and enter a new name.")
 
     elif choice == "Delete Place":
         st.subheader("Delete Place")
@@ -205,6 +243,37 @@ def main():
                     st.success(f"Visit logged for {selected_user_label.split(' (ID')[0]} at {selected_place_label.split(' (ID')[0]}")
                 else:
                     st.error("Please fill in all fields correctly.")
+
+    elif choice == "Update Visit":
+        st.subheader("Update a Visit")
+        users = get_users()
+        if not users:
+            st.info("No users found. Add a user first.")
+        else:
+            user_names = {f"{u[1]} (ID {u[0]})": u[0] for u in users}
+            selected_user_label = st.selectbox("Select user", list(user_names.keys()))
+            selected_user_id = user_names.get(selected_user_label)
+            if selected_user_id:
+                visits = get_user_visits(selected_user_id)
+                if not visits:
+                    st.info("No visits found for this user.")
+                else:
+                    visit_options = {f"{v[0]} on {v[1]} for {v[2]} min (Visit ID unknown)": idx for idx, v in enumerate(visits)}
+                    selected_visit_label = st.selectbox("Select visit to update", list(visit_options.keys()))
+                    new_date = st.date_input("New visit date")
+                    new_duration = st.number_input("New stay duration (minutes)", min_value=0, step=5)
+                    if st.button("Update Visit"):
+                        c.execute('''SELECT v.visit_id 
+                                     FROM visits v 
+                                     JOIN places p ON v.place_id = p.place_id 
+                                     WHERE v.user_id = ? AND p.place_name = ? AND v.visit_date = ? AND v.stay_duration = ?''', 
+                                  (selected_user_id, *selected_visit_label.split(' on ')[0:2], int(selected_visit_label.split(' for ')[1].split(' min')[0])))
+                        visit_record = c.fetchone()
+                        if visit_record:
+                            update_visit(visit_record[0], new_date.isoformat(), int(new_duration))
+                            st.success("Visit updated.")
+                        else:
+                            st.error("Could not find the selected visit.")
 
     elif choice == "Delete Visit":
         st.subheader("Delete a Visit")
