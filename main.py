@@ -3,7 +3,7 @@ import streamlit as st
 
 st.set_page_config(page_title="Visited Places Tracker", page_icon="🗺️", layout="wide")
 
-conn = sqlite3.connect('visited_places1.db')
+conn = sqlite3.connect('visited_places20.db')
 c = conn.cursor()
 
 c.execute('''CREATE TABLE IF NOT EXISTS users (
@@ -44,7 +44,7 @@ def log_visit(user_id, place_id, visit_date, stay_duration):
     conn.commit()
 
 def get_user_visits(user_id):
-    c.execute('''SELECT p.place_name, v.visit_date, v.stay_duration 
+    c.execute('''SELECT v.visit_id, p.place_name, v.visit_date, v.stay_duration 
                  FROM visits v 
                  JOIN places p ON v.place_id = p.place_id 
                  WHERE v.user_id = ?''', (user_id,))
@@ -258,22 +258,14 @@ def main():
                 if not visits:
                     st.info("No visits found for this user.")
                 else:
-                    visit_options = {f"{v[0]} on {v[1]} for {v[2]} min (Visit ID unknown)": idx for idx, v in enumerate(visits)}
+                    visit_options = {f"{v[1]} on {v[2]} for {v[3]} min (Visit ID {v[0]})": v[0] for v in visits}
                     selected_visit_label = st.selectbox("Select visit to update", list(visit_options.keys()))
+                    selected_visit_id = visit_options[selected_visit_label]
                     new_date = st.date_input("New visit date")
                     new_duration = st.number_input("New stay duration (minutes)", min_value=0, step=5)
                     if st.button("Update Visit"):
-                        c.execute('''SELECT v.visit_id 
-                                     FROM visits v 
-                                     JOIN places p ON v.place_id = p.place_id 
-                                     WHERE v.user_id = ? AND p.place_name = ? AND v.visit_date = ? AND v.stay_duration = ?''', 
-                                  (selected_user_id, *selected_visit_label.split(' on ')[0:2], int(selected_visit_label.split(' for ')[1].split(' min')[0])))
-                        visit_record = c.fetchone()
-                        if visit_record:
-                            update_visit(visit_record[0], new_date.isoformat(), int(new_duration))
-                            st.success("Visit updated.")
-                        else:
-                            st.error("Could not find the selected visit.")
+                        update_visit(selected_visit_id, new_date.isoformat(), int(new_duration))
+                        st.success("Visit updated.")
 
     elif choice == "Delete Visit":
         st.subheader("Delete a Visit")
@@ -289,20 +281,12 @@ def main():
                 if not visits:
                     st.info("No visits found for this user.")
                 else:
-                    visit_options = {f"{v[0]} on {v[1]} for {v[2]} min (Visit ID unknown)": idx for idx, v in enumerate(visits)}
+                    visit_options = {f"{v[1]} on {v[2]} for {v[3]} min (Visit ID {v[0]})": v[0] for v in visits}
                     selected_visit_label = st.selectbox("Select visit to delete", list(visit_options.keys()))
+                    selected_visit_id = visit_options[selected_visit_label]
                     if st.button("Delete Visit"):
-                        c.execute('''SELECT v.visit_id 
-                                     FROM visits v 
-                                     JOIN places p ON v.place_id = p.place_id 
-                                     WHERE v.user_id = ? AND p.place_name = ? AND v.visit_date = ? AND v.stay_duration = ?''', 
-                                  (selected_user_id, *selected_visit_label.split(' on ')[0:2], int(selected_visit_label.split(' for ')[1].split(' min')[0])))
-                        visit_record = c.fetchone()
-                        if visit_record:
-                            delete_visit(visit_record[0])
-                            st.success("Visit deleted.")
-                        else:
-                            st.error("Could not find the selected visit.")
+                        delete_visit(selected_visit_id)
+                        st.success("Visit deleted.")
 
     elif choice == "View Visits":
         st.subheader("View User Visits")
@@ -337,4 +321,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
